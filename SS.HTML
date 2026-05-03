@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SS.HTML | PRO SPACE</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&family=Orbitron:wght@400;900&display=swap" rel="stylesheet">
+    
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root {
+            --neon: #0011ff;
+            --red: #ff3131;
+            --border: rgba(0, 255, 255, 0.164);
+            --glass: rgb(0, 0, 0);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Cairo', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background: #000; color: #fff; overflow: hidden; height: 100vh; width: 100vw; }
+        
+        #space-canvas { position: fixed; inset: 0; z-index: -1; }
+
+        #custom-alert {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px);
+            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(15px);
+            border: 1px solid var(--neon); color: #fff; padding: 15px 25px;
+            border-radius: 15px; z-index: 20000; transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex; align-items: center; gap: 10px; box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
+        }
+        #custom-alert.error { border-color: var(--red); box-shadow: 0 0 20px rgba(255, 49, 49, 0.2); }
+        #custom-alert.show { transform: translateX(-50%) translateY(0); }
+
+        #confirm-dialog {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
+            display: none; align-items: center; justify-content: center; z-index: 30000;
+        }
+        .confirm-box {
+            width: 85%; max-width: 320px; background: var(--glass); border: 1px solid var(--red);
+            padding: 25px; border-radius: 20px; text-align: center; box-shadow: 0 0 30px rgba(255, 49, 49, 0.2);
+        }
+
+        #splash {
+            position: fixed; inset: 0; background: #000; z-index: 10000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .logo { font-family: 'Orbitron'; font-size: 8rem; color: var(--neon); text-shadow: 0 0 20px var(--neon); }
+
+        .page { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 100; background: transparent; }
+        
+        .box {
+            width: 90%; max-width: 400px; padding: 40px;
+            background: var(--glass); backdrop-filter: blur(25px);
+            border: 1px solid var(--border); border-radius: 30px; text-align: center;
+        }
+
+        .main-container { 
+            width: 100%; max-width: 1100px; height: 90vh; 
+            background: rgba(255, 255, 255, 0.02); backdrop-filter: blur(15px); 
+            display: flex; flex-direction: column; 
+            border: 1px solid var(--border); border-radius: 25px; overflow: hidden; margin: auto;
+        }
+
+        .dock { height: 80px; background: rgba(0, 0, 0, 0.7); display: flex; justify-content: space-around; align-items: center; border-top: 1px solid var(--border); }
+        .dock-btn { color: #888; cursor: pointer; text-align: center; flex: 1; transition: 0.3s; font-size: 0.8rem; }
+        .dock-btn.active { color: var(--neon); text-shadow: 0 0 10px var(--neon); }
+
+        .content { flex: 1; overflow-y: auto; padding: 20px; }
+
+        .card { background: rgba(255,255,255,0.05); padding: 18px; border-radius: 18px; display: flex; align-items: center; gap: 15px; cursor: pointer; border: 1px solid transparent; transition: 0.3s; margin-bottom: 10px; position: relative; }
+        .card:hover { border-color: var(--neon); background: rgba(0, 243, 255, 0.08); }
+        
+        .del-btn { color: var(--red); padding: 10px; font-weight: bold; font-size: 1.2rem; transition: 0.2s; z-index: 10; }
+        .del-btn:hover { transform: scale(1.2); }
+
+        #chat-view { position: fixed; inset: 0; background: transparent; z-index: 1000; transform: translateY(100%); transition: 0.5s; display: flex; flex-direction: column; }
+        #chat-view.active { transform: translateY(0); }
+        .chat-wrapper { width: 100%; max-width: 700px; margin: auto; height: 100%; display: flex; flex-direction: column; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(30px); border-inline: 1px solid var(--border); }
+
+        .inp { width: 100%; padding: 15px; background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 15px; color: #fff; margin-bottom: 15px; outline: none; text-align: right; }
+        .btn { width: 100%; padding: 18px; border: none; border-radius: 15px; background: var(--neon); color: #000; font-weight: 900; cursor: pointer; transition: 0.3s; margin-bottom: 10px; }
+        .btn.secondary { background: transparent; color: var(--neon); border: 1px solid var(--neon); }
+        .btn.danger { background: var(--red); color: #fff; }
+        .btn:active { transform: scale(0.97); }
+
+        .badge { position: absolute; top: 10px; left: 55%; background: var(--red); color: white; font-size: 0.7rem; min-width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    </style>
+</head>
+<body>
+
+    <div id="custom-alert">🛡️ <span id="alert-text"></span></div>
+    
+    <div id="confirm-dialog">
+        <div class="confirm-box">
+            <h3 style="margin-bottom: 15px;">حذف المحادثة؟</h3>
+            <p style="font-size: 0.9rem; opacity: 0.7; margin-bottom: 20px;">سيتم حذف سجل الرسائل نهائياً.</p>
+            <button class="btn danger" id="confirm-yes">حذف نهائي</button>
+            <button class="btn secondary" onclick="document.getElementById('confirm-dialog').style.display='none'">تراجع</button>
+        </div>
+    </div>
+
+    <canvas id="space-canvas"></canvas>
+    <div id="splash"><div class="logo">M❣️SY</div></div>
+
+    <div id="page-auth" class="page">
+        <div class="box">
+            <h1 style="font-family:'Orbitron'; color:var(--neon); margin-bottom:30px">M❣️SY</h1>
+            <input type="text" id="u-name" class="inp" placeholder="اسم المستخدم">
+            <input type="password" id="u-pass" class="inp" placeholder="كلمة المرور">
+            <button class="btn" onclick="System.handleAuth('login')">تسجيل الدخول</button>
+            <button class="btn secondary" onclick="System.handleAuth('signup')">إنشاء حساب جديد</button>
+        </div>
+    </div>
+
+    <div id="page-app" class="page">
+        <div class="main-container">
+            <header style="padding:15px 25px; border-bottom: 1px solid var(--border); display:flex; justify-content:space-between; align-items: center;">
+                <span style="font-family:'Orbitron'; color:var(--neon); font-weight:900">M❣️SY</span>
+                <span id="my-id" style="font-size:0.7rem; opacity:0.6"></span>
+            </header>
+            <div class="content">
+                <div id="view-search">
+                    <input type="text" id="s-inp" class="inp" placeholder="بحث عن مستخدمين..." oninput="System.search()">
+                    <div id="s-res"></div>
+                </div>
+                <div id="view-inbox" style="display:none"><div id="i-res"></div></div>
+            </div>
+            <nav class="dock">
+                <div class="dock-btn active" id="d-s" onclick="System.nav('search')">🌍 البحث</div>
+                <div class="dock-btn" id="d-i" onclick="System.nav('inbox')">💬 الرسائل <div id="global-badge" style="display:none" class="badge">0</div></div>
+                <div class="dock-btn" onclick="System.exit()">🔌 خروج</div>
+            </nav>
+        </div>
+    </div>
+
+    <div id="chat-view">
+        <div class="chat-wrapper">
+            <div style="padding:15px 20px; display:flex; align-items:center; gap:15px; border-bottom:1px solid var(--border)">
+                <span onclick="System.closeChat()" style="cursor:pointer; color:var(--neon); font-size:1.5rem">←</span>
+                <h4 id="c-name">المستخدم</h4>
+            </div>
+            <div class="content" id="c-msgs" style="display:flex; flex-direction:column; gap:12px"></div>
+            <div style="padding:15px; display:flex; gap:10px; border-top:1px solid var(--border)">
+                <input type="text" id="c-inp" class="inp" style="margin:0" placeholder="رسالة...">
+                <button class="btn" style="width:70px; margin:0" onclick="System.send()">✉️</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ملاحظة: تأكد أن الـ API Key أدناه لا يحتوي على مسافات زائدة
+        const firebaseConfig = {
+            apiKey: "AIzaSyCVfIR_ienQJN3AQAthWgcNMCQ9JIdWvak",
+            authDomain: "mmmmmmmmmmmmmm-613ff.firebaseapp.com",
+            projectId: "mmmmmmmmmmmmmm-613ff",
+            storageBucket: "mmmmmmmmmmmmmm-613ff.firebasestorage.app",
+            messagingSenderId: "968795700769",
+            appId: "1:968795700769:web:89802454be840393106d60"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        const System = {
+            user: null,
+            init: function() {
+                this.spaceEngine();
+                auth.onAuthStateChanged(u => {
+                    if(u) {
+                        db.collection('users').doc(u.uid).get().then(doc => {
+                            if(doc.exists) {
+                                this.user = doc.data();
+                                document.getElementById('my-id').innerText = "@" + this.user.username;
+                                this.show('page-app');
+                                this.listenInbox();
+                            }
+                        });
+                    } else { this.show('page-auth'); }
+                    setTimeout(() => document.getElementById('splash').style.display='none', 1500);
+                });
+            },
+            toast: function(txt, isError = true) {
+                const el = document.getElementById('custom-alert');
+                el.className = isError ? 'error show' : 'show';
+                document.getElementById('alert-text').innerText = txt;
+                setTimeout(() => el.classList.remove('show'), 3500);
+            },
+            show: (id) => { document.querySelectorAll('.page').forEach(p=>p.style.display='none'); document.getElementById(id).style.display='flex'; },
+            
+            handleAuth: async function(type) {
+                const u = document.getElementById('u-name').value.trim().toLowerCase();
+                const p = document.getElementById('u-pass').value;
+                
+                // التأكد من المدخلات
+                if(u.length < 3 || p.length < 6) return this.toast("الاسم 3+ والرمز 6+ رموز");
+
+                // استخدام دومين حقيقي لتجنب الرفض من بعض السيرفرات
+                const mail = `${u}@m-sy.com`; 
+
+                try {
+                    if(type === 'signup') {
+                        const check = await db.collection('users').where('username', '==', u).get();
+                        if(!check.empty) return this.toast("الاسم مستخدم بالفعل");
+                        
+                        const res = await auth.createUserWithEmailAndPassword(mail, p);
+                        await db.collection('users').doc(res.user.uid).set({ username: u, uid: res.user.uid });
+                        this.toast("تم بنجاح!", false);
+                    } else {
+                        await auth.signInWithEmailAndPassword(mail, p);
+                    }
+                } catch(e) {
+                    console.error(e);
+                    // معالجة رسائل الخطأ بدقة
+                    if (e.code === 'auth/operation-not-allowed') this.toast("فعل Email/Password من Firebase");
+                    else if (e.code === 'auth/invalid-email') this.toast("الاسم غير صالح");
+                    else this.toast("البيانات خاطئة أو الشبكة ضعيفة");
+                }
+            },
+
+            nav: function(v) {
+                document.getElementById('view-search').style.display = v==='search'?'block':'none';
+                document.getElementById('view-inbox').style.display = v==='inbox'?'block':'none';
+                document.getElementById('d-s').classList.toggle('active', v==='search');
+                document.getElementById('d-i').classList.toggle('active', v==='inbox');
+            },
+
+            search: async function() {
+                const q = document.getElementById('s-inp').value.trim().toLowerCase();
+                const res = document.getElementById('s-res');
+                if(!q) return res.innerHTML="";
+                const snap = await db.collection('users').where('username', '>=', q).limit(5).get();
+                res.innerHTML = "";
+                snap.forEach(doc => {
+                    const d = doc.data(); if(d.uid === this.user.uid) return;
+                    res.innerHTML += `<div class="card" onclick="System.openChat('${d.uid}', '${d.username}')"><h4>${d.username}</h4></div>`;
+                });
+            },
+
+            openChat: async function(uid, name) {
+                this.target = { uid, name };
+                const rid = [this.user.uid, uid].sort().join('_');
+                document.getElementById('c-name').innerText = name;
+                document.getElementById('chat-view').classList.add('active');
+                
+                if(this.unsubscribeChat) this.unsubscribeChat();
+
+                this.unsubscribeChat = db.collection('rooms').doc(rid).collection('messages').orderBy('time', 'asc').onSnapshot(snap => {
+                    const box = document.getElementById('c-msgs'); box.innerHTML="";
+                    snap.forEach(d => {
+                        const m = d.data();
+                        const side = m.sender === this.user.uid ? 'align-self:flex-end; background:var(--neon); color:#000' : 'align-self:flex-start; background:rgba(255,255,255,0.1)';
+                        box.innerHTML += `<div style="padding:10px 15px; border-radius:15px; max-width:75%; ${side}">${m.text}</div>`;
+                    });
+                    box.scrollTop = box.scrollHeight;
+                });
+                db.collection('rooms').doc(rid).update({ read: true }).catch(()=>{});
+            },
+
+            send: async function() {
+                const inp = document.getElementById('c-inp'); const txt = inp.value.trim();
+                if(!txt) return;
+                const rid = [this.user.uid, this.target.uid].sort().join('_');
+                inp.value = "";
+                await db.collection('rooms').doc(rid).collection('messages').add({ text: txt, sender: this.user.uid, time: firebase.firestore.FieldValue.serverTimestamp() });
+                await db.collection('rooms').doc(rid).set({ users: [this.user.uid, this.target.uid], lastMsg: txt, lastSender: this.user.uid, read: false, time: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+            },
+
+            confirmDelete: function(rid, e) {
+                e.stopPropagation();
+                const dialog = document.getElementById('confirm-dialog');
+                dialog.style.display = 'flex';
+                document.getElementById('confirm-yes').onclick = async () => {
+                    try {
+                        const msgs = await db.collection('rooms').doc(rid).collection('messages').get();
+                        const batch = db.batch();
+                        msgs.forEach(doc => batch.delete(doc.ref));
+                        batch.delete(db.collection('rooms').doc(rid));
+                        await batch.commit();
+                        dialog.style.display = 'none';
+                        this.toast("تم الحذف", false);
+                    } catch(e) { this.toast("فشل الحذف"); }
+                };
+            },
+
+            listenInbox: function() {
+                db.collection('rooms').where('users', 'array-contains', this.user.uid).onSnapshot(async snap => {
+                    const res = document.getElementById('i-res');
+                    const gBadge = document.getElementById('global-badge');
+                    let html = ""; let total = 0;
+                    
+                    for(const doc of snap.docs) {
+                        const r = doc.data(); 
+                        const rid = doc.id;
+                        const otherId = r.users.find(id => id !== this.user.uid);
+                        if(!otherId) continue;
+
+                        const isUnread = (r.lastSender !== this.user.uid && !r.read);
+                        if(isUnread) total++;
+                        
+                        const uDoc = await db.collection('users').doc(otherId).get();
+                        const u = uDoc.data();
+                        if(!u) continue;
+
+                        html += `<div class="card" onclick="System.openChat('${u.uid}', '${u.username}')">
+                            <div style="flex:1"><h4>${u.username}</h4><p style="opacity:0.4; font-size:0.8rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:150px">${r.lastMsg}</p></div>
+                            ${isUnread ? '<div class="badge" style="position:static; margin-left:10px">1</div>' : ''}
+                            <div class="del-btn" onclick="System.confirmDelete('${rid}', event)">✕</div>
+                        </div>`;
+                    }
+                    res.innerHTML = html || "<p style='text-align:center; opacity:0.5; margin-top:20px'>لا توجد رسائل</p>";
+                    gBadge.innerText = total; gBadge.style.display = total > 0 ? 'flex' : 'none';
+                });
+            },
+
+            closeChat: function() {
+                if(this.unsubscribeChat) this.unsubscribeChat();
+                document.getElementById('chat-view').classList.remove('active');
+            },
+            exit: () => auth.signOut().then(() => location.reload()),
+            spaceEngine: function() {
+                const c = document.getElementById('space-canvas'); const ctx = c.getContext('2d');
+                let w = c.width = window.innerWidth; let h = c.height = window.innerHeight;
+                const stars = []; for(let i=0; i<200; i++) stars.push({x:Math.random()*w, y:Math.random()*h, s:Math.random()*1.5, v:Math.random()*0.3});
+                function draw() { ctx.clearRect(0,0,w,h); ctx.fillStyle="rgba(255,255,255,0.8)"; stars.forEach(s => { ctx.beginPath(); ctx.arc(s.x, s.y, s.s, 0, Math.PI*2); ctx.fill(); s.y -= s.v; if(s.y<0) s.y=h; }); requestAnimationFrame(draw); }
+                draw(); window.onresize = () => { w=c.width=window.innerWidth; h=c.height=window.innerHeight; };
+            }
+        };
+        System.init();
+    </script>
+</body>
+</html>
